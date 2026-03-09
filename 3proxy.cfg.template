@@ -1,0 +1,9 @@
+log /dev/stdout
+nserver 8.8.8.8
+nserver 1.1.1.1
+
+allow * SERVER_B_IP_PLACEHOLDER
+deny *
+
+proxy -p3128
+socks -p1080

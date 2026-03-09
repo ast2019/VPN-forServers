@@ -1,0 +1,43 @@
+services:
+  3proxy:
+    image: 3proxy/3proxy:latest
+    container_name: 3proxy
+    restart: unless-stopped
+    ports:
+      - "${PORT_HTTP}:3128"
+      - "${PORT_SOCKS}:1080"
+    volumes:
+      - ./3proxy.cfg:/etc/3proxy/3proxy.cfg:ro
+
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - SERVERURL=${SERVER_A_IP}
+      - SERVERPORT=${PORT_WG}
+      - PEERS=${WG_PEERS}
+      - PEERDNS=8.8.8.8,1.1.1.1
+      - INTERNAL_SUBNET=10.13.13.0
+      - ALLOWEDIPS=0.0.0.0/0
+      - PERSISTENTKEEPALIVE_PEERS=all
+      - LOG_CONFS=true
+    volumes:
+      - ./wireguard:/config
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "${PORT_WG}:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wg", "show"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
