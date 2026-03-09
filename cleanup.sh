@@ -15,10 +15,17 @@ for c in "${CONTAINERS[@]}"; do
 done
 echo ""
 
-# نمایش sysctl های فعلی
-echo "تنظیمات sysctl فعلی سیستم:"
-echo "  net.ipv4.ip_forward              = $(sysctl -n net.ipv4.ip_forward)"
-echo "  net.ipv4.conf.all.src_valid_mark = $(sysctl -n net.ipv4.conf.all.src_valid_mark)"
+# نمایش sysctl های فعلی و مقادیر اصلی ذخیره‌شده
+echo "وضعیت sysctl:"
+echo "  فعلی  | net.ipv4.ip_forward              = $(sysctl -n net.ipv4.ip_forward)"
+echo "  فعلی  | net.ipv4.conf.all.src_valid_mark = $(sysctl -n net.ipv4.conf.all.src_valid_mark)"
+if [ -f .sysctl_backup ]; then
+    source .sysctl_backup
+    echo "  اصلی | net.ipv4.ip_forward              = $ORIG_IP_FORWARD"
+    echo "  اصلی | net.ipv4.conf.all.src_valid_mark = $ORIG_SRC_VALID"
+else
+    echo "  [هشدار] فایل backup پیدا نشد — sysctl برگردانده نمی‌شود"
+fi
 echo ""
 
 read -p "آیا مطمئنی؟ فقط همین کانتینرها پاک می‌شوند (y/N): " CONFIRM
@@ -35,22 +42,21 @@ for c in "${CONTAINERS[@]}"; do
         docker rm "$c" 2>/dev/null
     fi
 done
-
 docker compose down -v 2>/dev/null || true
 
-# برگرداندن sysctl ها
-echo ""
-echo "برگرداندن sysctl ها..."
-sysctl -w net.ipv4.ip_forward=0
-sysctl -w net.ipv4.conf.all.src_valid_mark=0
-echo "  net.ipv4.ip_forward              → 0"
-echo "  net.ipv4.conf.all.src_valid_mark → 0"
-
-# حذف از /etc/sysctl.conf اگر قبلاً نوشته شده بود
-if grep -q "src_valid_mark\|ip_forward" /etc/sysctl.conf 2>/dev/null; then
-    sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
-    sed -i '/net.ipv4.conf.all.src_valid_mark/d' /etc/sysctl.conf
-    echo "  /etc/sysctl.conf هم پاک شد."
+# برگرداندن مقادیر اصلی sysctl
+if [ -f .sysctl_backup ]; then
+    source .sysctl_backup
+    echo ""
+    echo "برگرداندن sysctl به مقادیر قبل از نصب..."
+    sysctl -w net.ipv4.ip_forward=$ORIG_IP_FORWARD
+    sysctl -w net.ipv4.conf.all.src_valid_mark=$ORIG_SRC_VALID
+    echo "  net.ipv4.ip_forward              → $ORIG_IP_FORWARD"
+    echo "  net.ipv4.conf.all.src_valid_mark → $ORIG_SRC_VALID"
+    rm -f .sysctl_backup
+else
+    echo ""
+    echo "  [هشدار] backup پیدا نشد — sysctl دست نخورده ماند. بعد از ریبوت وضعیت عادی می‌شود."
 fi
 
 echo ""
@@ -62,4 +68,4 @@ if [ "$CONFIRM2" = "y" ] || [ "$CONFIRM2" = "Y" ]; then
 fi
 
 echo ""
-echo "پاک‌سازی کامل شد. سرور به حالت اولیه برگشت."
+echo "پاک‌سازی کامل شد."

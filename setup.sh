@@ -24,17 +24,22 @@ fi
 
 if ! COMPOSE_CMD=$(get_compose_cmd); then
     echo "[ERROR] Docker Compose is not available."
-    echo "Install the Compose plugin or docker-compose and run setup again."
     exit 1
 fi
+
+# ذخیره مقادیر اصلی sysctl قبل از هر تغییری — برای cleanup
+ORIG_IP_FORWARD=$(sysctl -n net.ipv4.ip_forward)
+ORIG_SRC_VALID=$(sysctl -n net.ipv4.conf.all.src_valid_mark)
+echo "ORIG_IP_FORWARD=$ORIG_IP_FORWARD" > .sysctl_backup
+echo "ORIG_SRC_VALID=$ORIG_SRC_VALID" >> .sysctl_backup
+echo "sysctl backup saved: ip_forward=$ORIG_IP_FORWARD, src_valid_mark=$ORIG_SRC_VALID"
 
 # ساخت .env از روی example
 if [ ! -f .env ]; then
     cp .env.example .env
-    echo ".env file created."
 fi
 
-# گرفتن مقادیر از کاربر
+# گرفتن مقادیر
 read -p "Server A IP (this server): " INPUT_A
 read -p "Server B IP (offline server): " INPUT_B
 read -p "Number of WireGuard clients [1]: " INPUT_PEERS
@@ -67,7 +72,6 @@ sleep 5
 echo ""
 echo "--- WireGuard Peer 1 config ---"
 docker exec wireguard cat /config/peer1/peer1.conf 2>/dev/null \
-  || echo "Not ready yet. Wait a few seconds and run:"
-  echo "  docker exec wireguard cat /config/peer1/peer1.conf"
+  || echo "Not ready yet. Run: docker exec wireguard cat /config/peer1/peer1.conf"
 echo ""
 echo "Setup completed successfully."
