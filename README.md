@@ -1,16 +1,16 @@
 # VPN for Servers
 
-پروکسی + WireGuard در Docker برای اتصال سرور بدون اینترنت به اینترنت.
+Dockerized 3proxy + WireGuard setup to provide internet access for an offline server through a relay server.
 
-## سرویس‌ها
+## Services
 
-| سرویس | پروتکل | پورت |
-|-------|--------|------|
+| Service | Protocol | Port |
+|--------|----------|------|
 | 3proxy | HTTP | 33128 |
 | 3proxy | SOCKS5 | 31080 |
 | WireGuard | UDP | 51820 |
 
-## نصب
+## Install
 
 ```bash
 git clone https://github.com/ast2019/VPN-forServers.git
@@ -19,13 +19,13 @@ chmod +x setup.sh cleanup.sh
 ./setup.sh
 ```
 
-## حذف کامل
+## Full cleanup
 
 ```bash
 ./cleanup.sh
 ```
 
-## تنظیم سرور B
+## Configure Server B
 
 **apt:**
 ```bash
@@ -36,18 +36,18 @@ echo 'Acquire::https::Proxy "http://SERVER_A_IP:33128";' >> /etc/apt/apt.conf.d/
 **Docker:**
 ```bash
 mkdir -p /etc/systemd/system/docker.service.d
-cat > /etc/systemd/system/docker.service.d/proxy.conf <<EOF
+cat > /etc/systemd/system/docker.service.d/proxy.conf <<EOF2
 [Service]
 Environment="HTTP_PROXY=http://SERVER_A_IP:33128"
 Environment="HTTPS_PROXY=http://SERVER_A_IP:33128"
-EOF
+EOF2
 systemctl daemon-reload && systemctl restart docker
 ```
 
 **Git SSH:**
 ```bash
-cat >> ~/.ssh/config <<EOF
+cat >> ~/.ssh/config <<EOF2
 Host github.com
     ProxyCommand nc -x SERVER_A_IP:31080 %h %p
-EOF
+EOF2
 ```
