@@ -1,65 +1,65 @@
 #!/bin/bash
 
-get_compose_cmd() {
-    if docker compose version >/dev/null 2>&1; then
-        echo "docker compose"
-    elif command -v docker-compose >/dev/null 2>&1; then
-        echo "docker-compose"
-    else
-        return 1
-    fi
-}
-
-# Project containers
 CONTAINERS=("3proxy" "wireguard")
 
 echo "==============================="
-echo "  Service cleanup"
+echo "  پاک‌سازی سرویس‌ها"
 echo "==============================="
 echo ""
 
-if ! command -v docker &>/dev/null; then
-    echo "[ERROR] Docker is not installed."
-    exit 1
-fi
-
-if ! COMPOSE_CMD=$(get_compose_cmd); then
-    echo "[ERROR] Docker Compose is not available."
-    echo "Install the Compose plugin or docker-compose and run cleanup again."
-    exit 1
-fi
-
-# Show only this project's containers
-echo "Project containers:"
+# نمایش وضعیت کانتینرها
+echo "کانتینرهای این پروژه:"
 for c in "${CONTAINERS[@]}"; do
-    STATUS=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "not found")
+    STATUS=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "وجود ندارد")
     echo "  - $c : $STATUS"
 done
 echo ""
 
-read -p "Are you sure? Only these containers will be removed (y/N): " CONFIRM
+# نمایش sysctl های فعلی
+echo "تنظیمات sysctl فعلی سیستم:"
+echo "  net.ipv4.ip_forward              = $(sysctl -n net.ipv4.ip_forward)"
+echo "  net.ipv4.conf.all.src_valid_mark = $(sysctl -n net.ipv4.conf.all.src_valid_mark)"
+echo ""
+
+read -p "آیا مطمئنی؟ فقط همین کانتینرها پاک می‌شوند (y/N): " CONFIRM
 if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-    echo "Canceled."
+    echo "لغو شد."
     exit 0
 fi
 
+# حذف کانتینرها
 for c in "${CONTAINERS[@]}"; do
     if docker inspect "$c" &>/dev/null; then
-        echo "Removing container: $c"
-        docker stop "$c" 2>/dev/null || true
-        docker rm "$c" 2>/dev/null || true
+        echo "حذف کانتینر: $c"
+        docker stop "$c" 2>/dev/null
+        docker rm "$c" 2>/dev/null
     fi
 done
 
-$COMPOSE_CMD down -v 2>/dev/null || true
+docker compose down -v 2>/dev/null || true
 
+# برگرداندن sysctl ها
 echo ""
-read -p "Remove config files too? (y/N): " CONFIRM2
-if [ "$CONFIRM2" = "y" ] || [ "$CONFIRM2" = "Y" ]; then
-    rm -f 3proxy.cfg .env
-    rm -rf wireguard/
-    echo "Config files removed."
+echo "برگرداندن sysctl ها..."
+sysctl -w net.ipv4.ip_forward=0
+sysctl -w net.ipv4.conf.all.src_valid_mark=0
+echo "  net.ipv4.ip_forward              → 0"
+echo "  net.ipv4.conf.all.src_valid_mark → 0"
+
+# حذف از /etc/sysctl.conf اگر قبلاً نوشته شده بود
+if grep -q "src_valid_mark\|ip_forward" /etc/sysctl.conf 2>/dev/null; then
+    sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
+    sed -i '/net.ipv4.conf.all.src_valid_mark/d' /etc/sysctl.conf
+    echo "  /etc/sysctl.conf هم پاک شد."
 fi
 
 echo ""
-echo "Cleanup completed."
+read -p "فایل‌های کانفیگ هم پاک شوند؟ (y/N): " CONFIRM2
+if [ "$CONFIRM2" = "y" ] || [ "$CONFIRM2" = "Y" ]; then
+    rm -f 3proxy.cfg .env
+    rm -rf wireguard/
+    echo "کانفیگ‌ها پاک شدند."
+fi
+
+echo ""
+echo "پاک‌سازی کامل شد. سرور به حالت اولیه برگشت."
