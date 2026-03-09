@@ -1,47 +1,65 @@
 #!/bin/bash
 
-# نام کانتینرهای این پروژه
+get_compose_cmd() {
+    if docker compose version >/dev/null 2>&1; then
+        echo "docker compose"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        echo "docker-compose"
+    else
+        return 1
+    fi
+}
+
+# Project containers
 CONTAINERS=("3proxy" "wireguard")
-VOLUMES=("vpn-forservers_default" "$(basename "$PWD")_default")
 
 echo "==============================="
-echo "  پاک‌سازی سرویس‌ها"
+echo "  Service cleanup"
 echo "==============================="
 echo ""
 
-# نمایش کانتینرهایی که قرار است حذف شوند
-echo "کانتینرهای این پروژه:"
+if ! command -v docker &>/dev/null; then
+    echo "[ERROR] Docker is not installed."
+    exit 1
+fi
+
+if ! COMPOSE_CMD=$(get_compose_cmd); then
+    echo "[ERROR] Docker Compose is not available."
+    echo "Install the Compose plugin or docker-compose and run cleanup again."
+    exit 1
+fi
+
+# Show only this project's containers
+echo "Project containers:"
 for c in "${CONTAINERS[@]}"; do
-    STATUS=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "وجود ندارد")
+    STATUS=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "not found")
     echo "  - $c : $STATUS"
 done
 echo ""
 
-read -p "آیا مطمئنی؟ فقط همین کانتینرها پاک می‌شوند (y/N): " CONFIRM
+read -p "Are you sure? Only these containers will be removed (y/N): " CONFIRM
 if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-    echo "لغو شد."
+    echo "Canceled."
     exit 0
 fi
 
-# فقط کانتینرهای این پروژه را متوقف و حذف کن
 for c in "${CONTAINERS[@]}"; do
     if docker inspect "$c" &>/dev/null; then
-        echo "حذف کانتینر: $c"
-        docker stop "$c" 2>/dev/null
-        docker rm "$c" 2>/dev/null
+        echo "Removing container: $c"
+        docker stop "$c" 2>/dev/null || true
+        docker rm "$c" 2>/dev/null || true
     fi
 done
 
-# فقط volume های این پروژه را حذف کن
-docker compose down -v 2>/dev/null || true
+$COMPOSE_CMD down -v 2>/dev/null || true
 
 echo ""
-read -p "فایل‌های کانفیگ هم پاک شوند؟ (y/N): " CONFIRM2
+read -p "Remove config files too? (y/N): " CONFIRM2
 if [ "$CONFIRM2" = "y" ] || [ "$CONFIRM2" = "Y" ]; then
     rm -f 3proxy.cfg .env
     rm -rf wireguard/
-    echo "کانفیگ‌ها پاک شدند."
+    echo "Config files removed."
 fi
 
 echo ""
-echo "پاک‌سازی کامل شد."
+echo "Cleanup completed."
